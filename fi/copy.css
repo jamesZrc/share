@@ -1,0 +1,20 @@
+td.row-actions .mini-btn.copied {
+  color: #2e7d32; border-color: #a5d6a7;
+  background: linear-gradient(180deg, #f1fbf2 0%, #e6f6e8 100%);
+  box-shadow: 0 3px 10px rgba(46, 125, 50, .18);
+}
+
+/* 复制图标 */
+td.row-actions .mini-btn .ico {
+  display: inline-block; width: 10px; height: 10px;
+  position: relative; flex-shrink: 0;
+}
+td.row-actions .mini-btn .ico::before,
+td.row-actions .mini-btn .ico::after {
+  content: ""; position: absolute;
+  width: 7px; height: 8px;
+  border: 1.4px solid currentColor; border-radius: 2px;
+  background: #fff;
+}
+td.row-actions .mini-btn .ico::before { left: 0; top: 0; }
+td.row-actions .mini-btn .ico::after  { left: 3px; top: 3px; background: transparent; }

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>文件列表</title>
+
+  <!-- ===== CSS 模块 ===== -->
+  <link rel="stylesheet" href="/html/fi/core.css?v=1">
+  <link rel="stylesheet" href="/html/fi/list.css?v=1">
+  <link rel="stylesheet" href="/html/fi/upload.css?v=1">
+  <link rel="stylesheet" href="/html/fi/newdir.css?v=1">
+  <link rel="stylesheet" href="/html/fi/copy.css?v=1">
+  <link rel="stylesheet" href="/html/fi/edit.css?v=1">
+  <link rel="stylesheet" href="/html/fi/newfile.css?v=1">
+  <link rel="stylesheet" href="/html/fi/search.css?v=1">
+  <!-- 新增功能：在这里加一行 <link> -->
+
+</head>
+<body>
+
+<div id="dropzone">
+  <div class="big">把文件拖到这里上传</div>
+  <div class="small">或点击此区域选择文件（支持多选）</div>
+</div>
+
+<div id="actions">
+  <input type="text" id="dirName" placeholder="输入名称" autocomplete="off" spellcheck="false">
+  <button id="newDirBtn" type="button">📁 新建目录</button>
+   <button id="newFileBtn" type="button">📄 新建文件</button>
+</div>
+
+<input type="file" id="picker" multiple style="display:none">
+<ul id="list"></ul>
+
+<!-- 文件编辑器弹窗（edit 模块用） -->
+<div id="editorModal" hidden>
+  <div class="editor-box">
+    <div class="editor-header">
+      <span class="editor-title">编辑文件</span>
+      <span class="editor-file" id="editorFile"></span>
+      <button type="button" class="editor-close" id="editorClose">✕</button>
+    </div>
+    <textarea id="editorText" spellcheck="false"></textarea>
+    <div class="editor-footer">
+      <span class="editor-status" id="editorStatus"></span>
+      <button type="button" class="editor-btn" id="editorCancel">取消</button>
+      <button type="button" class="editor-btn primary" id="editorSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== JS 模块（core 必须最先，main 必须最后） ===== -->
+<script src="/html/fi/core.js?v=1"></script>
+<script src="/html/fi/upload.js?v=1"></script>
+<script src="/html/fi/newdir.js?v=1"></script>
+<script src="/html/fi/copy.js?v=1"></script>
+<script src="/html/fi/edit.js?v=1"></script>
+<!-- 新增功能：在这里加一行 <script> -->
+<script src="/html/fi/main.js?v=1"></script>
+<script src="/html/fi/newfile.js?v=1"></script>
+<script src="/html/fi/search.js?v=1"></script>

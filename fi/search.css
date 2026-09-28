@@ -1,0 +1,53 @@
+/* 搜索区：跟 #dirName / 按钮同一行，靠右 */
+#actions #searchWrap {
+  margin-left: auto;             /* 推到最右 */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 输入框：与 #dirName 完全同款样式 */
+#actions #searchBox {
+  padding: 9px 14px;
+  font-size: 14px;
+  border: 1px solid #cfe0f0;
+  border-radius: 8px;
+  outline: none;
+  width: 220px;
+  font-family: inherit;
+  color: var(--text);
+  background: #fff;
+  transition: border-color .15s, box-shadow .15s;
+}
+#actions #searchBox:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(30,136,229,.12);
+}
+#actions #searchBox::placeholder { color: #9aa8b5; }
+
+/* 匹配计数 */
+#actions #searchInfo {
+  font-size: 13px;
+  color: var(--text-sub);
+  white-space: nowrap;
+  min-width: 40px;
+  text-align: right;
+}
+
+/* 高亮匹配字符 */
+table tbody mark {
+  background: #fff2a8;
+  color: #7a5c00;
+  padding: 0 1px;
+  border-radius: 2px;
+  font-weight: 700;
+}
+
+/* 移动端：搜索框整行换下去 */
+@media (max-width: 700px) {
+  #actions #searchWrap {
+    margin-left: 0;
+    width: 100%;
+  }
+  #actions #searchBox { flex: 1; width: auto; }
+}
