@@ -1,0 +1,206 @@
+#!/usr/bin/env bash
+# wdfs — WebDAV 文件服务命令行客户端
+# 用法: wdfs <command> [args]    （wdfs help 看命令）
+set -euo pipefail
+
+CONF="${WDFS_CONF:-$HOME/.wdfs.conf}"
+[[ -f "$CONF" ]] && source "$CONF"
+
+WDFS_URL="${WDFS_URL:-http://14.18.111.222:18898}"
+WDFS_USER="${WDFS_USER:-admin}"
+WDFS_PASS="${WDFS_PASS:-4337085}"
+WEBDAV_PREFIX="/upresourceshare"
+
+C_RED=$'\033[31m'; C_GRN=$'\033[32m'; C_YEL=$'\033[33m'; C_RST=$'\033[0m'
+die()  { echo "${C_RED}错误: $*${C_RST}" >&2; exit 1; }
+info() { echo "${C_GRN}$*${C_RST}"; }
+warn() { echo "${C_YEL}$*${C_RST}" >&2; }
+
+# ---------- URL 拼接 ----------
+urlenc() {
+  python3 -c "import sys,urllib.parse; print('/'.join(urllib.parse.quote(s) for s in sys.argv[1].split('/')))" "$1"
+}
+read_url()  { local p="${1:-/}"; p="${p#/}"; echo "$WDFS_URL/$(urlenc "$p")"; }
+write_url() { local p="${1:-/}"; p="${p#/}"; echo "$WDFS_URL$WEBDAV_PREFIX/$(urlenc "$p")"; }
+
+# ---------- curl 包装 ----------
+dav() {
+  local -a a=(-sS)
+  [[ -n "$WDFS_USER" ]] && a+=(-u "$WDFS_USER:$WDFS_PASS")
+  curl "${a[@]}" "$@"
+}
+
+# ---------- 命令 ----------
+cmd_ls() {
+  local path="${1:-/}"
+  local html
+  html=$(dav "$(read_url "$path")") || die "无法访问 $path"
+  echo "$html" | grep -oP '<a href="\K[^"]+' \
+    | grep -v '^\.\.$' \
+    | grep -v '^/' \
+    | grep -v '^http' \
+    | grep -v '^#' \
+    | sort -u
+}
+
+cmd_mkdir() {
+  local path="$1"; [[ -z "${1:-}" ]] && die "用法: wdfs mkdir <path>"
+  local old_ifs="$IFS"; IFS='/'
+  local parts=($path); IFS="$old_ifs"
+  local acc=""
+  for p in "${parts[@]}"; do
+    [[ -z "$p" ]] && continue
+    acc="$acc/$p"
+    local code
+    code=$(dav -o /dev/null -w '%{http_code}' -X MKCOL "$(write_url "$acc")/")
+    case "$code" in
+      201) info "创建: $acc" ;;
+      405) warn "已存在: $acc" ;;
+      *) die "创建失败 [$acc]: HTTP $code" ;;
+    esac
+  done
+}
+
+cmd_touch() {
+  local path="$1"; [[ -z "${1:-}" ]] && die "用法: wdfs touch <path>"
+  local code
+  code=$(dav -o /dev/null -w '%{http_code}' -X PUT --data-binary '' "$(write_url "$path")")
+  case "$code" in
+    20*|201|204) info "已创建: $path" ;;
+    *) die "失败: HTTP $code" ;;
+  esac
+}
+
+cmd_put() {
+  local lf="$1" rp="${2:-$(basename "$1")}"
+  [[ ! -f "$lf" ]] && die "本地文件不存在: $lf"
+  local code
+  code=$(dav -o /dev/null -w '%{http_code}' -T "$lf" "$(write_url "$rp")")
+  case "$code" in
+    20*|201|204) info "上传成功: $lf → $rp" ;;
+    *) die "上传失败: HTTP $code" ;;
+  esac
+}
+
+cmd_get() {
+  local rp="$1" lf="${2:-$(basename "$1")}"
+  local code
+  code=$(dav -o "$lf" -w '%{http_code}' "$(read_url "$rp")")
+  case "$code" in
+    200) info "下载成功: $rp → $lf" ;;
+    *) rm -f "$lf"; die "下载失败: HTTP $code" ;;
+  esac
+}
+
+cmd_rm() {
+  local path="$1"; [[ -z "${1:-}" ]] && die "用法: wdfs rm <path>"
+  local code
+  code=$(dav -o /dev/null -w '%{http_code}' -X DELETE "$(write_url "$path")")
+  case "$code" in
+    20*|204) info "已删除: $path" ;;
+    *) die "删除失败: HTTP $code" ;;
+  esac
+}
+
+cmd_mv() {
+  local src="$1" dst="$2"; [[ -z "${2:-}" ]] && die "用法: wdfs mv <src> <dst>"
+  local durl; durl="$(write_url "$dst")"
+  [[ "$dst" != *.* ]] && durl="$durl/"
+  local code
+  code=$(dav -o /dev/null -w '%{http_code}' -X MOVE \
+    -H "Destination: $durl" "$(write_url "$src")")
+  case "$code" in
+    201|204) info "已移动: $src → $dst" ;;
+    412) die "目标已存在: $dst" ;;
+    *) die "移动失败: HTTP $code" ;;
+  esac
+}
+
+cmd_cp() {
+  local src="$1" dst="$2"; [[ -z "${2:-}" ]] && die "用法: wdfs cp <src> <dst>"
+  local durl; durl="$(write_url "$dst")"
+  [[ "$dst" != *.* ]] && durl="$durl/"
+  local code
+  code=$(dav -o /dev/null -w '%{http_code}' -X COPY \
+    -H "Destination: $durl" "$(write_url "$src")")
+  case "$code" in
+    201|204) info "已复制: $src → $dst" ;;
+    412) die "目标已存在: $dst" ;;
+    *) die "复制失败: HTTP $code" ;;
+  esac
+}
+
+cmd_cat() {
+  [[ -z "${1:-}" ]] && die "用法: wdfs cat <path>"
+  dav "$(read_url "$1")"
+}
+
+cmd_edit() {
+  local path="$1"; [[ -z "${1:-}" ]] && die "用法: wdfs edit <path>"
+  local tmp; tmp=$(mktemp)
+  dav -o "$tmp" "$(read_url "$path")" || { rm -f "$tmp"; die "无法读取 $path"; }
+  ${EDITOR:-vim} "$tmp"
+  local code
+  code=$(dav -o /dev/null -w '%{http_code}' -T "$tmp" "$(write_url "$path")")
+  rm -f "$tmp"
+  case "$code" in
+    20*|201|204) info "已保存: $path" ;;
+    *) die "保存失败: HTTP $code" ;;
+  esac
+}
+
+cmd_url() {
+  [[ -z "${1:-}" ]] && die "用法: wdfs url <path>"
+  read_url "$1"
+}
+
+cmd_help() {
+  cat <<EOF
+wdfs - WebDAV 文件服务命令行客户端
+
+用法: wdfs <命令> [参数]
+
+命令:
+  ls [path]             列出目录（默认 /）
+  mkdir <path>          创建目录（支持多级）
+  touch <path>          创建空文件
+  put <local> [remote]  上传本地文件
+  get <remote> [local]  下载文件
+  cat <path>            打印文件内容
+  edit <path>           用 \$EDITOR 编辑远程文件
+  rm <path>             删除文件/目录
+  mv <src> <dst>        移动/重命名
+  cp <src> <dst>        复制
+  url <path>            显示完整 URL（分享用）
+  help                  显示帮助
+
+配置（写入 ~/.wdfs.conf）:
+  WDFS_URL="http://14.18.111.222:18898"
+  WDFS_USER="admin"
+  WDFS_PASS="your-password"
+
+也可用同名环境变量覆盖。
+EOF
+}
+
+main() {
+  [[ $# -eq 0 ]] && { cmd_help; exit 0; }
+  local cmd="$1"; shift
+  case "$cmd" in
+    ls|list)         cmd_ls "$@" ;;
+    mkdir|md)        cmd_mkdir "$@" ;;
+    touch)           cmd_touch "$@" ;;
+    put|up|upload)   cmd_put "$@" ;;
+    get|down)        cmd_get "$@" ;;
+    cat|view)        cmd_cat "$@" ;;
+    edit)            cmd_edit "$@" ;;
+    rm|del|delete)   cmd_rm "$@" ;;
+    mv|move|rename)  cmd_mv "$@" ;;
+    cp|copy)         cmd_cp "$@" ;;
+    url|link)        cmd_url "$@" ;;
+    help|-h|--help)  cmd_help ;;
+    *) die "未知命令: $cmd（wdfs help 查看用法）" ;;
+  esac
+}
+
+main "$@"
