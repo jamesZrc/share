@@ -20,7 +20,24 @@ warn() { echo "${C_YEL}$*${C_RST}" >&2; }
 urlenc() {
   python3 -c "import sys,urllib.parse; print('/'.join(urllib.parse.quote(s) for s in sys.argv[1].split('/')))" "$1"
 }
-read_url()  { local p="${1:-/}"; p="${p#/}"; echo "$WDFS_URL/$(urlenc "$p")"; }
+read_url()  {
+  local p="${1:-/}"
+
+  # 已经是完整 URL，直接返回，不拼接
+  if [[ "$p" =~ ^http?:// ]]; then
+    echo "$p"
+    return
+  fi
+
+    if [[ "$p" =~ ^https?:// ]]; then
+      echo "$p"
+      return
+    fi
+
+  # 相对路径：去掉前导 /，拼接 WDFS_URL
+  p="${p#/}"
+  echo "$WDFS_URL/$(urlenc "$p")"
+ }
 write_url() { local p="${1:-/}"; p="${p#/}"; echo "$WDFS_URL$WEBDAV_PREFIX/$(urlenc "$p")"; }
 
 # ---------- curl 包装 ----------
@@ -184,23 +201,34 @@ EOF
 }
 
 main() {
-  [[ $# -eq 0 ]] && { cmd_help; exit 0; }
-  local cmd="$1"; shift
-  case "$cmd" in
-    ls|list)         cmd_ls "$@" ;;
-    mkdir|md)        cmd_mkdir "$@" ;;
-    touch)           cmd_touch "$@" ;;
-    put|up|upload)   cmd_put "$@" ;;
-    get|down)        cmd_get "$@" ;;
-    cat|view)        cmd_cat "$@" ;;
-    edit)            cmd_edit "$@" ;;
-    rm|del|delete)   cmd_rm "$@" ;;
-    mv|move|rename)  cmd_mv "$@" ;;
-    cp|copy)         cmd_cp "$@" ;;
-    url|link)        cmd_url "$@" ;;
-    help|-h|--help)  cmd_help ;;
-    *) die "未知命令: $cmd（wdfs help 查看用法）" ;;
-  esac
+  # 无参数：显示帮助
+    [[ $# -eq 0 ]] && { cmd_help; exit 0; }
+
+    # 第一个参数是路径或 URL → 默认执行 get
+    # 比如：wdfs http://host/path/a.pdf
+    #      wdfs /ffff/report.xlsx
+    local first="$1"
+    if [[ "$first" == /* ]] || [[ "$first" =~ ^https?:// ]]; then
+      cmd_get "$@"
+      return
+    fi
+
+    local cmd="$1"; shift
+    case "$cmd" in
+      ls|list)           cmd_ls "$@" ;;
+      mkdir|md)          cmd_mkdir "$@" ;;
+      touch)             cmd_touch "$@" ;;
+      put|up|upload)     cmd_put "$@" ;;
+      get|down|download) cmd_get "$@" ;;
+      cat|view)          cmd_cat "$@" ;;
+      edit)              cmd_edit "$@" ;;
+      rm|del|delete)     cmd_rm "$@" ;;
+      mv|move|rename)    cmd_mv "$@" ;;
+      cp|copy)           cmd_cp "$@" ;;
+      url|link)          cmd_url "$@" ;;
+      help|-h|--help)    cmd_help ;;
+      *) die "未知命令: $cmd（wdfs help 查看用法）" ;;
+    esac
 }
 
 main "$@"
