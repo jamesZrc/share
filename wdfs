@@ -18,7 +18,24 @@ warn() { echo "${C_YEL}$*${C_RST}" >&2; }
 
 # ---------- URL 拼接 ----------
 urlenc() {
-  python3 -c "import sys,urllib.parse; print('/'.join(urllib.parse.quote(s) for s in sys.argv[1].split('/')))" "$1"
+  local str="$1"
+    local out="" i c hex
+    for (( i=0; i<${#str}; i++ )); do
+      c="${str:i:1}"
+      case "$c" in
+        [a-zA-Z0-9.~_/-])
+          out+="$c"
+          ;;
+        *)
+          hex=$(printf '%s' "$c" | od -An -tx1 | tr -d ' \n')
+          while [[ -n "$hex" ]]; do
+            out+="%${hex:0:2}"
+            hex="${hex:2}"
+          done
+          ;;
+      esac
+    done
+    printf '%s' "$out"
 }
 read_url()  {
   local p="${1:-/}"
